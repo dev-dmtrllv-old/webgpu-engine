@@ -1,11 +1,17 @@
+import { AssetManager } from "./AssetManager";
 import { ConfigManager } from "./ConfigManager";
 import { SubSystem } from "./SubSystem";
 
-@SubSystem.dependencies([ConfigManager])
+@SubSystem.dependencies([ConfigManager, AssetManager])
 export class SceneManager extends SubSystem
 {
-	protected async initialize(): Promise<void>
+	protected async initialize(config: {}): Promise<void>
 	{
-
+		console.log("init", this);
+	}
+	
+	protected async terminate(): Promise<void>
+	{
+		console.log("terminate", this);
 	}
 }

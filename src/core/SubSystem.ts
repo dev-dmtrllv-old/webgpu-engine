@@ -11,6 +11,12 @@ export abstract class SubSystem<Config extends {} = {}>
 		Class[DEPENDENCIES] = types;
 	}
 
+	public static readonly getDependencies = <T extends SubSystem>(type: SubSystemType<T>): SubSystemType[] =>
+	{
+		const Class: SubSystemClass = type as any;
+		return Class[DEPENDENCIES] || [];
+	}
+
 	public static readonly initialize = async <T extends SubSystem>(system: T, config: T extends SubSystem<infer Config> ? Config : {}) =>
 	{
 		assert(() => !system.isInitialized_, "System is already initialized!");
@@ -25,11 +31,11 @@ export abstract class SubSystem<Config extends {} = {}>
 		system.isInitialized_ = true;
 	}
 
-	public readonly engine: Engine;
+	public readonly engine: Engine<any>;
 
 	private isInitialized_: boolean = false;
 
-	public constructor(engine: Engine)
+	public constructor(engine: Engine<any>)
 	{
 		this.engine = engine;
 	}
