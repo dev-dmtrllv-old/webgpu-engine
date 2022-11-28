@@ -201,13 +201,13 @@ export class Arch
 
 	public readonly getComponent = <T>(bufferIndex: number, offset: number, Class: Class<T>) =>
 	{
-		const [componentOffset] = this.layout.get(Ecs.getComponentIndex(Class));
+		const [componentOffset] = this.layout.get(Ecs.getComponentIndex(Class))!;
 		return Serializer.parse(Class, this.pool_.buffers[bufferIndex].buffer, offset + componentOffset);
 	}
 
 	public readonly flushComponent = <T>(bufferIndex: number, offset: number, component: T) =>
 	{
-		const [componentOffset] = this.layout.get(Ecs.getComponentIndex(component.constructor as any));
+		const [componentOffset] = this.layout.get(Ecs.getComponentIndex((component as any).constructor))!;
 		Serializer.serialize(component, this.pool_.buffers[bufferIndex].buffer, offset + componentOffset);
 	}
 }

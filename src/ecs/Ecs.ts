@@ -4,13 +4,13 @@ import { Entity } from "./Entity";
 
 export namespace Ecs
 {
+	const BITMASK = Symbol();
+	const BIT_INDEX = Symbol();
+	
 	export type ComponentClass = Class<any, any, {
 		[BITMASK]: number;
 		[BIT_INDEX]: number;
 	}>;
-
-	const BITMASK = Symbol();
-	const BIT_INDEX = Symbol();
 
 	const components: ComponentClass[] = [];
 
@@ -18,8 +18,7 @@ export namespace Ecs
 
 	const entityFinilizationRegistry = new FinalizationRegistry<number>((entityIndex) => 
 	{
-		console.log("entity gc...");
-		entities[entityIndex] = null;
+		delete entities[entityIndex];
 	});
 
 	export const getComponentBitmask = (Class: Class) => (Class as ComponentClass)[BITMASK] || 0;
@@ -59,11 +58,6 @@ export namespace Ecs
 		if (!Class)
 			throw new Error();
 		return Class;
-	}
-
-	export const log = () =>
-	{
-		console.log(rootArch["next_"]);
 	}
 
 	export const getComponentIndex = <T>(Class: Class<T>) => (Class as ComponentClass)[BIT_INDEX] || 0;

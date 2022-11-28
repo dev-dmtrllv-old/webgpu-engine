@@ -1,6 +1,6 @@
 export class AssertException extends Error
 {
-	public readonly condition: string;
+	public readonly condition: string = "";
 
 	public constructor(condition: AssertCondition, message?: string)
 	{
@@ -13,10 +13,11 @@ export class AssertException extends Error
  * @param condition The condition which should evaluate to true in normal circumstances
  * @param message The message to throw 
  */
-export const assert = (condition: AssertCondition, message?: string) =>
+export const assert = <T extends AssertCondition>(condition: T, message?: string): condition is any =>
 {
 	if (!condition())
 		throw new AssertException(condition, message);
+	return true;
 }
 
 export type AssertCondition = () => any;

@@ -21,18 +21,18 @@ export namespace Serializer
 
 	type PrimitiveType = keyof typeof primitiveSizes;
 
+	const LAYOUT = Symbol();
+	const SIZE = Symbol();
+	const PARSER = Symbol();
+	const SERIALIZER = Symbol();
+
 	type SerializeClass<T = any> = Class<T, any, {
 		[SIZE]: number;
 		[LAYOUT]: Prop[];
 		[PARSER]: Parser;
 		[SERIALIZER]: Serializer;
 	}>;
-
-	const LAYOUT = Symbol();
-	const SIZE = Symbol();
-	const PARSER = Symbol();
-	const SERIALIZER = Symbol();
-
+	
 	const primitiveSizes = {
 		u8: 1,
 		i8: 1,
@@ -204,7 +204,7 @@ export namespace Serializer
 				name: key as string,
 				offset: totalSize,
 				size,
-				type,
+				type: type as any,
 				parser: getParser(type),
 				serializer: getSerializer(type),
 			});
@@ -229,7 +229,7 @@ export namespace Serializer
 
 	export const serialize = <T>(obj: T, buffer: ArrayBuffer, offset: number = 0) =>
 	{
-		const Class = obj.constructor as SerializeClass<T>;
+		const Class = (obj as any).constructor as SerializeClass<T>;
 		const size = getClassSize(Class);
 		const view = new DataView(buffer, offset, size);
 		const serializer = getClassSerializer(Class);
