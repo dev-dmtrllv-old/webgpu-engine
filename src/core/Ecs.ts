@@ -1,4 +1,4 @@
-import { Serializer } from "serialize";
+import { Serializer } from "core/serialize";
 import { Arch } from "./Arch";
 import { Entity } from "./Entity";
 

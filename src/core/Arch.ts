@@ -1,4 +1,4 @@
-import { Serializer } from "serialize";
+import { Serializer } from "core/serialize";
 import { assert } from "utils";
 import { Ecs } from "./Ecs";
 

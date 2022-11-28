@@ -1,4 +1,4 @@
-import { Serializer } from "serialize";
+import { Serializer } from "core/serialize";
 
 @Serializer.register(Vector2.layout)
 export class Vector2

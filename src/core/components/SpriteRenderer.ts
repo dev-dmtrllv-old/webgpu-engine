@@ -1,6 +1,6 @@
 import { Ecs } from "ecs/Ecs";
-import { Serializer } from "serialize";
-import { Vector2 } from "types";
+import { Serializer } from "core/serialize";
+import { Vector2 } from "core/types";
 
 @Ecs.component()
 @Serializer.register(SpriteRenderer.layout)
