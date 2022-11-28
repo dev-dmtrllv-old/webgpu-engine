@@ -1,0 +1,14 @@
+* {
+	box-sizing: border-box;
+}
+
+html, body, #root {
+	width: 100vw;
+	height: 100vh;
+	overflow: hidden;
+	margin: 0;
+	padding: 0;
+	background-color: rgb(16, 16, 16);
+	color: rgb(206, 206, 206);
+	font-family: sans-serif;
+}
