@@ -2,252 +2,212 @@ import { FixedArray } from "./FixedArray";
 
 export namespace Serializer
 {
-	type Type<T, K extends keyof T> = T[K] extends FixedArray<infer Type, infer Size> ? ArrayType<Type extends number ? PrimitiveType : Class<Type>, Size> : PrimitiveType | Class<T[K]>;
+	const IS_SERIALIZABLE = Symbol("IS_SERIALIZABLE");
+	const INDEX = Symbol("INDEX");
 
-	type ArrayType<T, Size extends number> = [T, Size];
-
-	export type ClassLayout<T> = {
-		[K in keyof T]?: Type<T, K>;
-	};
-
-	export type Prop = {
-		name: string;
-		offset: number;
+	type PrimitiveInfo = {
+		_parse: Parser;
+		_serialize: Serializer;
 		size: number;
-		type: Type<any, any>;
-		parser: Parser;
-		serializer: Serializer;
-	};
-
-	type PrimitiveType = keyof typeof primitiveSizes;
-
-	const LAYOUT = Symbol();
-	const SIZE = Symbol();
-	const PARSER = Symbol();
-	const SERIALIZER = Symbol();
-
-	type SerializeClass<T = any> = Class<T, any, {
-		[SIZE]: number;
-		[LAYOUT]: Prop[];
-		[PARSER]: Parser;
-		[SERIALIZER]: Serializer;
-	}>;
-	
-	const primitiveSizes = {
-		u8: 1,
-		i8: 1,
-		u16: 2,
-		i16: 2,
-		u32: 4,
-		i32: 4,
-		f32: 4,
-		f64: 8,
-		bool: 1
-	};
+	}
 
 	type Parser = (view: DataView, offset: number) => any;
+	type Serializer = (view: DataView, offset: number, value: any) => any;
 
-	type Serializer<Value = any> = (view: DataView, offset: number, value: Value) => any;
+	type ObjectParser<T extends TypeInfo> = (buffer: ArrayBuffer, offset?: number) => T;
+	type ObjectSerializer<T extends TypeInfo> = (buffer: ArrayBuffer, obj: T, offset?: number) => any;
 
-	const primitiveParsers: { [K in keyof typeof primitiveSizes]: Parser } = {
-		u8: (view, offset) => view.getUint8(offset),
-		i8: (view, offset) => view.getInt8(offset),
-		u16: (view, offset) => view.getUint16(offset),
-		i16: (view, offset) => view.getInt16(offset),
-		u32: (view, offset) => view.getUint32(offset),
-		i32: (view, offset) => view.getInt32(offset),
-		f32: (view, offset) => view.getFloat32(offset),
-		f64: (view, offset) => view.getFloat64(offset),
-		bool: (view, offset) => Boolean(view.getUint8(offset)),
+	type Prop = PropInfo & {
+		name: string;
 	};
 
-	const primitiveSerializers: { [K in keyof typeof primitiveSizes]: Serializer } = {
-		u8: (view, offset, value) => view.setUint8(offset, value),
-		i8: (view, offset, value) => view.setInt8(offset, value),
-		u16: (view, offset, value) => view.setUint16(offset, value),
-		i16: (view, offset, value) => view.setInt16(offset, value),
-		u32: (view, offset, value) => view.setUint32(offset, value),
-		i32: (view, offset, value) => view.setInt32(offset, value),
-		f32: (view, offset, value) => view.setFloat32(offset, value),
-		f64: (view, offset, value) => view.setFloat64(offset, value),
-		bool: (view, offset, value) => view.setUint8(offset, value),
+	type PrimitiveType = keyof typeof primitiveTypes;
+
+	type TypeInfo = {
+		[key: string]: number | FixedArray<any, any> | TypeInfo;
 	};
 
-	const getPrimitiveSize = (key: PrimitiveType): number => primitiveSizes[key];
-	const getClassSize = (Class: SerializeClass): number => Class[SIZE] || 0;
+	type Object<T extends TypeInfo> = {
+		[K in keyof T]: T[K] extends PrimitiveType ? number : never;
+	};
 
-	const getTypeSize = (type: any): number =>
-	{
-		switch (typeof type)
-		{
-			case "string":
-				return getPrimitiveSize(type as PrimitiveType);
-			case "function":
-				return getClassSize(type);
-			default:
-				if (Array.isArray(type))
-				{
-					const [itemType, size] = type;
-					return getTypeSize(itemType) * size;
-				}
-				throw new Error(`Could not get size for `, type);
+	type TypeLayout<T extends TypeInfo> = {
+		[K in keyof T]:
+		T[K] extends number ? PrimitiveType :
+		T[K] extends FixedArray<infer AT, infer S> ?
+		[AT extends number ? PrimitiveType : AT extends TypeInfo ? Serializable<AT> : never, S] :
+		T[K] extends TypeInfo ? Serializable<T[K]> :
+		never;
+	};
+
+	type Serializable<T extends TypeInfo> = Readonly<{
+		[IS_SERIALIZABLE]: true;
+		[INDEX]: number;
+		serialize: ObjectSerializer<T>;
+		parse: ObjectParser<T>;
+		_parse: Parser;
+		_serialize: Serializer;
+		// create: () => Object<T>;
+		props: ReadonlyArray<Prop>;
+		size: number;
+	}>;
+
+	type PropInfo = { size: number, offset: number, _parse: Parser, _serialize: Serializer };
+
+
+
+	const primitiveTypes = {
+		u8: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setUint8(offset, value),
+			_parse: (view: DataView, offset: number) => view.getUint8(offset),
+			size: 1
+		},
+		i8: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setInt8(offset, value),
+			_parse: (view: DataView, offset: number) => view.getInt8(offset),
+			size: 1
+		},
+		u16: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setUint16(offset, value),
+			_parse: (view: DataView, offset: number) => view.getUint16(offset),
+			size: 2
+		},
+		i16: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setInt16(offset, value),
+			_parse: (view: DataView, offset: number) => view.getInt16(offset),
+			size: 2
+		},
+		u32: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setUint32(offset, value),
+			_parse: (view: DataView, offset: number) => view.getUint32(offset),
+			size: 4
+		},
+		i32: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setInt32(offset, value),
+			_parse: (view: DataView, offset: number) => view.getInt32(offset),
+			size: 4
+		},
+		f32: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setFloat32(offset, value),
+			_parse: (view: DataView, offset: number) => view.getFloat32(offset),
+			size: 4
+		},
+		f64: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setFloat64(offset, value),
+			_parse: (view: DataView, offset: number) => view.getFloat64(offset),
+			size: 8
+		},
+		bool: {
+			_serialize: (view: DataView, offset: number, value: any) => view.setUint8(offset, value),
+			_parse: (view: DataView, offset: number) => view.getUint8(offset),
+			size: 1
 		}
 	};
 
-	const createClassParser = (type: Class, layout: Prop[]): Parser => (view, classOffset) =>
-	{
-		const obj = new type();
-		layout.forEach(({ name, offset, parser }) => 
-		{
-			obj[name] = parser(view, classOffset + offset);
-		});
-		return obj;
-	};
-	
-	const createClassSerializer = (layout: Prop[]): Serializer => (view, classOffset, data) =>
-	{
-		layout.forEach(({ name, offset, serializer }) => 
-		{
-			serializer(view, classOffset + offset, data[name]);
-		});
-	};
+	const isSerializable = (obj: any): obj is Serializable<any> => !!obj[IS_SERIALIZABLE];
 
-	const getArrayParser = ([type, size]: ArrayType<Class | PrimitiveType, any>): Parser =>
-	{
-		const itemSize = getTypeSize(type);
-		const parser = getParser(type);
+	const getPrimitiveInfo = (key: any): PrimitiveInfo => (primitiveTypes as any)[key];
 
-		switch (typeof type)
+	const getPropInfo = <T extends TypeInfo>(prop: TypeLayout<T>[string], offset: number): [PropInfo, number] =>
+	{
+		if (Array.isArray(prop))
 		{
-			case "string":
-			case "function":
-				return (view, offset) => 
+			const [type, size] = prop;
+			const info = getPropInfo(type, offset);
+			const propSize = info[0].size;
+			info[0].size *= size;
+			return [{
+				...info[0],
+				_parse: (view, innerOffset) =>
 				{
-					const arr = new FixedArray(size);
+					let data = new FixedArray(size);
 					for (let i = 0; i < size; i++)
-						arr.set(i, parser(view, offset + (i * itemSize)));
-					return arr;
-				};
-			default:
-				throw new Error(`Could not get parser for `, type);
-		}
-	};
-
-	const getPrimitiveParser = (type: PrimitiveType) => primitiveParsers[type];
-	const getClassParser = (type: SerializeClass) => type[PARSER];
-
-	const getParser = (type: any): Parser =>
-	{
-		switch (typeof type)
-		{
-			case "string":
-				return getPrimitiveParser(type as PrimitiveType);
-			case "function":
-				return getClassParser(type);
-			default:
-				if (Array.isArray(type))
-					return getArrayParser(type as ArrayType<any, any>);
-				throw new Error(`Could not get size for `, type);
-		}
-	};
-
-	const getArraySerializer = ([type, size]: ArrayType<Class | PrimitiveType, any>): Serializer =>
-	{
-		const itemSize = getTypeSize(type);
-		const serializer = getSerializer(type);
-
-		switch (typeof type)
-		{
-			case "string":
-			case "function":
-				return (view, offset, value) => 
+						data.set(i, info[0]._parse(view, innerOffset + (i * propSize)));
+					return data;
+				},
+				_serialize: (view, innerOffset, arr: FixedArray<any, any>) =>
 				{
-					const arr = value as FixedArray<any, any>;
 					for (let i = 0; i < size; i++)
-						serializer(view, offset + (i * itemSize), arr.at(i));
-				};
-			default:
-				throw new Error(`Could not get parser for `, type);
+						info[0]._serialize(view, innerOffset + (i * propSize), arr.at(i));
+				},
+			}, offset + info[0].size];
 		}
+		else
+		{
+			switch (typeof prop)
+			{
+				case "string":
+					const info = getPrimitiveInfo(prop);
+					return [{ ...info, offset } as any, offset + info.size];
+				case "object":
+					if (isSerializable(prop))
+						return [{ ...prop, offset } as any, offset + prop.size];
+			}
+		}
+		throw new Error(`Could not get prop info for ${JSON.stringify(prop)}`);
 	}
 
-	const getPrimitiveSerializer = (type: PrimitiveType) => primitiveSerializers[type];
-	const getClassSerializer = (type: SerializeClass) => type[SERIALIZER];
-
-	const getSerializer = (type: any): Serializer =>
+	const parseLayout = <T extends TypeInfo>(info: TypeLayout<T>): [Prop[], number] =>
 	{
-		switch (typeof type)
-		{
-			case "string":
-				return getPrimitiveSerializer(type as PrimitiveType);
-			case "function":
-				return getClassSerializer(type);
-			default:
-				if (Array.isArray(type))
-					return getArraySerializer(type as ArrayType<any, any>);
-				throw new Error(`Could not get size for `, type);
-		}
-	}
-
-	const createSerializeInfo = <T>(layout: ClassLayout<T>) => 
-	{
-		const orderedLayout: Prop[] = [];
-
 		let totalSize = 0;
 
-		for (const key in layout)
+		const props: Prop[] = Object.keys(info).map((name) => 
 		{
-			const type = layout[key];
-			const size = getTypeSize(type);
+			const prop = info[name];
+			const [propInfo, newSize] = getPropInfo(prop, totalSize);
+			totalSize = newSize;
+			return {
+				...propInfo,
+				name
+			};
+		});
 
-			orderedLayout.push({
-				name: key as string,
-				offset: totalSize,
-				size,
-				type: type as any,
-				parser: getParser(type),
-				serializer: getSerializer(type),
-			});
-
-			totalSize += size;
-		}
-
-		return {
-			layout: orderedLayout,
-			size: totalSize
-		};
-	};
-
-	export const register = <T>(layout: ClassLayout<T>): ClassDecorator => (ctor: any) => 
-	{
-		const info = createSerializeInfo(layout);
-		ctor[LAYOUT] = info.layout;
-		ctor[SIZE] = info.size;
-		ctor[PARSER] = createClassParser(ctor, info.layout);
-		ctor[SERIALIZER] = createClassSerializer(info.layout);
-	};
-
-	export const serialize = <T>(obj: T, buffer: ArrayBuffer, offset: number = 0) =>
-	{
-		const Class = (obj as any).constructor as SerializeClass<T>;
-		const size = getClassSize(Class);
-		const view = new DataView(buffer, offset, size);
-		const serializer = getClassSerializer(Class);
-		serializer(view, 0, obj);
+		return [props, totalSize];
 	}
 
-	export const parse = <T>(obj: Class<T>, buffer: ArrayBuffer, offset: number = 0) =>
+	const registeredTypes: Serializable<any>[] = [];
+
+	export const createType = <T extends TypeInfo>(info: TypeLayout<T>, name?: string): Serializable<T> =>
 	{
-		const Class = obj as SerializeClass;
-		const size = getClassSize(Class);
-		const view = new DataView(buffer, offset, size);
-		const parser = getClassParser(Class);
-		return parser(view, 0);
+		const [props, size] = parseLayout(info);
+
+		const index = registeredTypes.length;
+
+		const type = Object.seal(Object.freeze({
+			name: name || `undefined-${index}`,
+			[INDEX]: index,
+			[IS_SERIALIZABLE]: true,
+			props,
+			_parse: (view, offset) => 
+			{
+				let o: any = {};
+
+				for (const prop of props)
+					o[prop.name] = prop._parse(view, offset + prop.offset);
+
+				return o;
+			},
+			_serialize: (view, offset, data) => 
+			{
+				for (const prop of props)
+					prop._serialize(view, offset + prop.offset, data[prop.name]);
+			},
+			parse: <T extends TypeInfo>(buffer: ArrayBuffer, offset: number = 0): T => 
+			{
+				return type._parse(new DataView(buffer, offset, type.size), 0);
+			},
+			serialize: <T extends TypeInfo>(buffer: ArrayBuffer, obj: T, offset: number = 0) => 
+			{
+				const view = new DataView(buffer, offset, type.size);
+				type._serialize(view, 0, obj);
+			},
+			size
+		})) as Serializable<T>;
+
+		registeredTypes.push(type);
+
+		return type;
 	}
 
-	export const createLayout = <T>(layout: ClassLayout<T>): ClassLayout<T> => layout;
-
-	export const getSize = <T>(Class: Class<T, any, any>): number => Class[SIZE] || 0;
-
-	export const getLayout = <T>(Class: Class<T, any, any>): Serializer.Prop[] => Class[LAYOUT];
+	export const createBuffer = <T extends TypeInfo>(type: Serializable<T>, count: number = 1) => new ArrayBuffer(type.size * count);
 }

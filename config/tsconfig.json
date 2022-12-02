@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"lib": [
+			"ES2022"
+		],
+		"module": "CommonJS",
+		"target": "ES2022",
+		"rootDir": "./src",
+		"outDir": "./build",
+		"allowSyntheticDefaultImports": true,
+		"moduleResolution": "Node",
+		"esModuleInterop": true
+	},
+	"include": [
+		"./src/**/*"
+	]
+}

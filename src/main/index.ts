@@ -1,0 +1,55 @@
+import { app, BrowserWindow, screen } from "electron";
+import fs from "fs";
+import path from "path";
+
+const [, ...args] = process.argv;
+
+const isDev = args.includes("--dev");
+
+if (isDev)
+	process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
+
+let w: BrowserWindow;
+
+app.commandLine.appendSwitch("enable-unsafe-webgpu");
+
+app.whenReady().then(async () => 
+{
+	w = new BrowserWindow({
+		enableLargerThanScreen: true,
+		show: false,
+		hasShadow: true,
+		paintWhenInitiallyHidden: true,
+		webPreferences: {
+			contextIsolation: false,
+			backgroundThrottling: true,
+			devTools: isDev,
+			nodeIntegration: true,
+			nodeIntegrationInWorker: true,
+			experimentalFeatures: true,
+			spellcheck: false
+		}
+	});
+
+	w.setMenu(null);
+
+	await w.loadFile(__dirname + "/public/index.html");
+
+	if (isDev)
+	{
+		const displays = screen.getAllDisplays();
+
+		const display = displays.find(s => s.internal) || displays[0];
+
+		const [width, height] = w.getSize();
+		const centerX = ((display.bounds.x - (display.bounds.width + display.bounds.x)) / 2) - (width / 2);
+		const centerY = (((display.bounds.height + display.bounds.y) - display.bounds.y) / 2) - (height / 2);
+		w.setPosition(centerX, centerY);
+		w.maximize();
+		w.webContents.openDevTools({ mode: "right" });
+
+		fs.watch(path.resolve(__dirname, "public"), {  }, () => w.webContents.reload());
+	}
+
+	w.show();
+});

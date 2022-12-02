@@ -1,0 +1,1 @@
+export const exec = async <R, Args extends any[] = []>(callback: (...args: Args) => R, ...args: Args) => await callback(...args);

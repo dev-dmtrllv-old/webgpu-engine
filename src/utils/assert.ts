@@ -13,11 +13,11 @@ export class AssertException extends Error
  * @param condition The condition which should evaluate to true in normal circumstances
  * @param message The message to throw 
  */
-export const assert = <T extends AssertCondition>(condition: T, message?: string): condition is any =>
+export const assert = <R extends any = any>(condition: AssertCondition<R>, message?: string): R | never =>
 {
 	if (!condition())
 		throw new AssertException(condition, message);
-	return true;
+	return true as any;
 }
 
-export type AssertCondition = () => any;
+export type AssertCondition<R extends any = any> = () => R;
