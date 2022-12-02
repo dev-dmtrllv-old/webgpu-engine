@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen } from "electron";
+import { app, session, BrowserWindow, screen } from "electron";
 import fs from "fs";
 import path from "path";
 
@@ -15,6 +15,17 @@ app.commandLine.appendSwitch("enable-unsafe-webgpu");
 
 app.whenReady().then(async () => 
 {
+	session.defaultSession.webRequest.onHeadersReceived((details, callback) =>
+	{
+		callback({
+			responseHeaders: {
+				...details.responseHeaders,
+				'Cross-Origin-Opener-Policy': 'same-origin',
+				'Cross-Origin-Embedder-Policy': 'require-corp',
+			}
+		});
+	});
+
 	w = new BrowserWindow({
 		enableLargerThanScreen: true,
 		show: false,
@@ -48,7 +59,7 @@ app.whenReady().then(async () =>
 		w.maximize();
 		w.webContents.openDevTools({ mode: "right" });
 
-		fs.watch(path.resolve(__dirname, "public"), {  }, () => w.webContents.reload());
+		fs.watch(path.resolve(__dirname, "public"), {}, () => w.webContents.reload());
 	}
 
 	w.show();

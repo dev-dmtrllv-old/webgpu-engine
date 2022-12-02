@@ -4,6 +4,9 @@ export namespace Serializer
 {
 	const IS_SERIALIZABLE = Symbol("IS_SERIALIZABLE");
 	const INDEX = Symbol("INDEX");
+	const TYPE = Symbol("TYPE");
+
+	interface Index<T extends TypeInfo> { readonly INDEX: number, type(): T };
 
 	type PrimitiveInfo = {
 		_parse: Parser;
@@ -24,7 +27,7 @@ export namespace Serializer
 	type PrimitiveType = keyof typeof primitiveTypes;
 
 	type TypeInfo = {
-		[key: string]: number | FixedArray<any, any> | TypeInfo;
+		[key: string]: boolean | number | FixedArray<any, any> | TypeInfo;
 	};
 
 	type Object<T extends TypeInfo> = {
@@ -35,8 +38,9 @@ export namespace Serializer
 		[K in keyof T]:
 		T[K] extends number ? PrimitiveType :
 		T[K] extends FixedArray<infer AT, infer S> ?
-		[AT extends number ? PrimitiveType : AT extends TypeInfo ? Serializable<AT> : never, S] :
-		T[K] extends TypeInfo ? Serializable<T[K]> :
+		[AT extends number ? PrimitiveType : AT extends TypeInfo ? Index<AT> : never, S] :
+		T[K] extends TypeInfo ? Index<T[K]> :
+		T[K] extends boolean ? "bool" :
 		never;
 	};
 
@@ -47,7 +51,6 @@ export namespace Serializer
 		parse: ObjectParser<T>;
 		_parse: Parser;
 		_serialize: Serializer;
-		// create: () => Object<T>;
 		props: ReadonlyArray<Prop>;
 		size: number;
 	}>;
@@ -104,8 +107,6 @@ export namespace Serializer
 		}
 	};
 
-	const isSerializable = (obj: any): obj is Serializable<any> => !!obj[IS_SERIALIZABLE];
-
 	const getPrimitiveInfo = (key: any): PrimitiveInfo => (primitiveTypes as any)[key];
 
 	const getPropInfo = <T extends TypeInfo>(prop: TypeLayout<T>[string], offset: number): [PropInfo, number] =>
@@ -140,8 +141,13 @@ export namespace Serializer
 					const info = getPrimitiveInfo(prop);
 					return [{ ...info, offset } as any, offset + info.size];
 				case "object":
-					if (isSerializable(prop))
-						return [{ ...prop, offset } as any, offset + prop.size];
+					{
+						console.log(prop)
+						if (prop.INDEX === undefined)
+							throw new Error("Given value is not serializable!");
+						const o = getSerializable(prop);
+						return [{ ...o, offset } as any, offset + o.size];
+					}
 			}
 		}
 		throw new Error(`Could not get prop info for ${JSON.stringify(prop)}`);
@@ -166,8 +172,11 @@ export namespace Serializer
 	}
 
 	const registeredTypes: Serializable<any>[] = [];
+	const typeLayouts: TypeLayout<any>[] = [];
 
-	export const createType = <T extends TypeInfo>(info: TypeLayout<T>, name?: string): Serializable<T> =>
+	export const getRegisteredLayouts = (): ReadonlyArray<TypeLayout<any>> => typeLayouts;
+
+	export const createType = <T extends TypeInfo>(info: TypeLayout<T>, name?: string): Index<T> =>
 	{
 		const [props, size] = parseLayout(info);
 
@@ -205,9 +214,12 @@ export namespace Serializer
 		})) as Serializable<T>;
 
 		registeredTypes.push(type);
+		typeLayouts.push(JSON.parse(JSON.stringify(info)));
 
-		return type;
+		return { INDEX: index,  type: () => { return type } } as any;
 	}
 
-	export const createBuffer = <T extends TypeInfo>(type: Serializable<T>, count: number = 1) => new ArrayBuffer(type.size * count);
+	export const createBuffer = <T extends TypeInfo, Shared extends boolean>(type: Serializable<T>, count: number = 1, shared?: Shared): Shared extends true ? SharedArrayBuffer : ArrayBuffer => new (shared ? SharedArrayBuffer : ArrayBuffer)(type.size * count) as any;
+
+	export const getSerializable = <T extends TypeInfo>(index: Index<T>): Serializable<T> => registeredTypes[index.INDEX];
 }
