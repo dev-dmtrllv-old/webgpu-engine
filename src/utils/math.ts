@@ -1,0 +1,2 @@
+export const align = (num: number, alignment: number) => num < alignment ? alignment : num + (num - (num % alignment));
+export const clamp = (val: number, min: number = -Infinity, max: number = Infinity) => val < min ? min : val > max ? max : val;

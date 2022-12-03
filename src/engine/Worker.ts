@@ -4,63 +4,76 @@ import { Message } from "./WorkerMessageSystem";
 
 export type WorkerInitializeData = {
 	index: number;
-	eventBuffer: SharedArrayBuffer;
+	messageBuffer: SharedArrayBuffer;
 	messages: string[];
+	workersCount: number;
+	messageCount: number;
 };
 
 class EngineWorker
 {
 	private static instance_: EngineWorker | null = null;
 
+	public static readonly getBufferIndex = (msg: Message<any, any>) => (this.index_ * (this.messageCount_ + 1)) + msg.index;
+
 	private static readonly initialize = (data: Partial<WorkerInitializeData>) =>
 	{
-		if (EngineWorker.instance_ !== null)
+		if (this.instance_ !== null)
 			throw new Error("EngineWorker is already initialized!");
 
 		if (!data)
 			throw new Error("Could not initialize web worker without data!");
-		else if (data?.eventBuffer === undefined)
-			throw new Error("Could not initialize web worker without event buffer!");
+		else if (data?.messageBuffer === undefined)
+			throw new Error("Could not initialize web worker without message buffer!");
 		else if (data?.index === undefined)
 			throw new Error("Could not initialize web worker without index!");
 		else if (data?.messages === undefined)
 			throw new Error("Could not initialize web worker without messages!");
+		else if (data?.workersCount === undefined)
+			throw new Error("Could not initialize web worker without workersCount!");
+		else if (data?.messageCount === undefined)
+			throw new Error("Could not initialize web worker without messageCount!");
 
-		const { index, eventBuffer, messages } = data;
+		const { index, messageBuffer, messages, workersCount, messageCount } = data;
 
-		messages.forEach(msg => EngineWorker.registeredMessages_[msg] = EngineWorker.handlerCounter_++);
+		this.index_ = index;
+		this.messageCount_ = messageCount;
+		this.messageBuffer_ = new Int32Array(messageBuffer, 0, messageBuffer.byteLength / Int32Array.BYTES_PER_ELEMENT);
 
-		const buffer = new Int32Array(eventBuffer);
+		messages.forEach(msg => this.registeredMessages_[msg] = this.handlerCounter_++);
 
-		EngineWorker.instance_ = new EngineWorker(index, buffer);
+		this.instance_ = new EngineWorker();
 
-		buffer[index] = 1;
-		Atomics.notify(buffer, index);
+		Atomics.notify(this.messageBuffer_, index * messageCount);
 	}
 
+
 	private static readonly registeredMessages_: { [key: string]: number } = {};
+	private static readonly messageHandlers_: ((data: any) => any)[] = [this.initialize];
 
-	private static readonly messageHandlers_: ((data: any) => any)[] = [EngineWorker.initialize];
-
+	private static messageCount_: number = 0;
+	private static index_: number = 0;
+	private static messageBuffer_: Int32Array = new Int32Array();
 	private static handlerCounter_ = 1;
 
-	private static readonly handleMessage = (e: MessageEvent<any>) =>
+	private static readonly handleMessage = async (e: MessageEvent<any>) =>
 	{
 		assert(() => e.data.message !== undefined, "Could not get message!");
 
-		const handler = EngineWorker.messageHandlers_[e.data.message];
+		const handler = this.messageHandlers_[e.data.message];
 		if (!handler)
 		{
 			console.warn(`Could not find handler for message with index ${e.data.message}`);
 			return;
 		}
-		handler(e.data.data || {});
+		await handler(e.data.data || {});
+		Atomics.notify(this.messageBuffer_, (this.index_ * this.messageCount_) + e.data.message);
 	}
 
 	public static readonly main = async (): Promise<void> =>
 	{
 		console.log("Worker entry");
-		self.onmessage = EngineWorker.handleMessage;
+		self.onmessage = this.handleMessage;
 	}
 
 	private onMessage = <Args>(message: Message<any, Args>, callback: (data: Args) => any) =>
@@ -71,14 +84,8 @@ class EngineWorker
 		EngineWorker.messageHandlers_[index] = callback;
 	}
 
-	private readonly index_: number;
-	private readonly eventBuffer_: Int32Array;
-
-	private constructor(index: number, eventBuffer: Int32Array)
+	private constructor()
 	{
-		this.index_ = index;
-		this.eventBuffer_ = eventBuffer;
-
 		this.onMessage(Engine.MESSAGES.TEST, ({ test }) => 
 		{
 			console.log("got test message with data:", test);

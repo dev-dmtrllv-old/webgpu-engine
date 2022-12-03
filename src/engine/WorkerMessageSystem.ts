@@ -10,7 +10,7 @@ export namespace WorkerMessageSystem
 {
 	const registeredMessages_: { [key: string]: Message<any, any> } = {};
 
-	const registeredMessageStrings_: string[] = [];
+	const registeredMessageStrings_: string[] = ["ENGINE_WORKERS_INITIALIZE"];
 
 	export const INITIALIZE_INDEX = 0;
 	let registeredCounter_: number = 1; // zero is reserved for the initialization message
@@ -28,5 +28,9 @@ export namespace WorkerMessageSystem
 		return registeredMessages_[message];
 	}
 
-	export const getRegisteredMessages = (): string[] => [...registeredMessageStrings_];
+	export const getRegisteredMessages = (): string[] => 
+	{
+		const [,...messages] = registeredMessageStrings_;
+		return messages;
+	};
 }

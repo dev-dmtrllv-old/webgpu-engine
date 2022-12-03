@@ -1,6 +1,6 @@
 import { assert } from "utils";
-import { FixedArray } from "./serialize";
-import { Message, WorkerMessageSystem } from "./WorkerMessageSystem";
+import {  WorkerMessageSystem } from "./WorkerMessageSystem";
+import { WorkerSystem } from "./WorkerSystem";
 
 export const enum EngineStatus
 {
@@ -30,35 +30,21 @@ export class Engine<WorkersCount extends number = 4>
 		return Engine.instance_;
 	}
 
-	private readonly workers_: FixedArray<Worker, WorkersCount>;
-	private readonly eventBuffer_: SharedArrayBuffer;
-	private readonly intEventBuffer_: Int32Array;
+	public readonly workersCount: WorkersCount;
 
 	private status_: EngineStatus = EngineStatus.Initializing;
+	private workerSystem_: WorkerSystem<WorkersCount> | null = null;
+
+	private get workerSystem(): WorkerSystem<WorkersCount>
+	{
+		if (!this.workerSystem_)
+			throw new Error("WorkerSystem is not initialized yet!");
+		return this.workerSystem_;
+	}
 
 	private constructor(workersCount: WorkersCount)
 	{
-		this.workers_ = new FixedArray<Worker, WorkersCount>(workersCount);
-		this.eventBuffer_ = new SharedArrayBuffer(1024);
-		this.intEventBuffer_ = new Int32Array(this.eventBuffer_);
-
-		for (let i = 0; i < workersCount; i++)
-			this.workers_.set(i, new Worker(new URL("./Worker.ts", import.meta.url)));
-	}
-
-	private readonly emitMessage = <Args>(message: Message<any, Args>, data: Args) =>
-	{
-		this.workers_.forEach((worker) => worker.postMessage({ message: message.index, data }));
-	}
-
-	private readonly sendMessage = <Args>(worker: Worker, message: Message<any, Args>, data: Args) => worker.postMessage({ message: message.index, data });
-
-	private readonly waitForWorker = async (index: number, expectedValue: number, timeout?: number) =>
-	{
-		const { async, value } = Atomics.waitAsync(this.intEventBuffer_, index, expectedValue as any, timeout);
-		if (async)
-			return await value;
-		return value;
+		this.workersCount = workersCount;
 	}
 
 	private readonly initialize = async (): Promise<boolean> =>
@@ -71,21 +57,11 @@ export class Engine<WorkersCount extends number = 4>
 				throw new Error("Engine is already initialized!");
 		}
 
-		this.workers_.forEach((worker, index) => worker.postMessage({
-			message: WorkerMessageSystem.INITIALIZE_INDEX,
-			data: {
-				index,
-				eventBuffer: this.eventBuffer_,
-				messages: WorkerMessageSystem.getRegisteredMessages()				
-			}
-		}));
+		const messages = WorkerMessageSystem.getRegisteredMessages();
 
-		const results = await Promise.all(this.workers_.map<Promise<WorkerWaitInfo>>((_, index) => this.waitForWorker(index, 0)).data);
+		const ws = this.workerSystem_ = await WorkerSystem.create(this.workersCount, messages);
 
-		if(results.find(r => r !== "ok"))
-			return false;
-			
-		this.emitMessage(Engine.MESSAGES.TEST, { test: "hihi" });
+		console.log(await ws.emitMessage(Engine.MESSAGES.TEST, { test: "hihi" }));
 
 		this.status_ = EngineStatus.Initialized;
 		return true;
