@@ -1,6 +1,6 @@
 import { align } from "utils/math";
+import { Engine, Message } from "./Engine";
 import { FixedArray } from "./serialize";
-import { Message, WorkerMessageSystem } from "./WorkerMessageSystem";
 
 class EngineWorker
 {
@@ -51,7 +51,7 @@ export class WorkerSystem<WorkersCount extends number>
 		const results = await Promise.all(this.workers_.map((worker, index) => 
 		{
 			worker.nativeWorker.postMessage({
-				message: WorkerMessageSystem.INITIALIZE_INDEX,
+				message: Engine.INITIALIZE_INDEX,
 				data: {
 					index,
 					messageBuffer: this.messageBuffer_,

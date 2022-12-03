@@ -1,5 +1,4 @@
 import { assert } from "utils";
-import {  WorkerMessageSystem } from "./WorkerMessageSystem";
 import { WorkerSystem } from "./WorkerSystem";
 
 export const enum EngineStatus
@@ -8,11 +7,28 @@ export const enum EngineStatus
 	Initialized
 };
 
+const ARGS = Symbol("MESSAGE_ARGS");
+
+export type Message<Msg extends string, Args> = {
+	index: number;
+	message: Msg;
+	[ARGS]: Args;
+};
+
 export class Engine<WorkersCount extends number = 4>
 {
-	public static readonly MESSAGES = {
-		TEST: WorkerMessageSystem.registerMessage<{ test: string }>("test"),
-	};
+	public static readonly registerMessage = <Args = any, Msg extends string = string>(message: Msg): Message<Msg, Args> =>
+	{
+		if (this.registeredMessages_[message])
+			throw new Error(`Message ${message} is already registered with index ${this.registeredMessages_[message].index}!`);
+			this.registeredMessages_[message] = {
+			index: this.registeredCounter_++,
+			message,
+			[ARGS]: {}
+		};
+		this.registeredMessageStrings_.push(message);
+		return this.registeredMessages_[message];
+	}
 
 	private static instance_: Engine<any> | null = null;
 
@@ -29,6 +45,23 @@ export class Engine<WorkersCount extends number = 4>
 		await Engine.instance_.initialize();
 		return Engine.instance_;
 	}
+	
+	private static readonly getRegisteredMessages = (): string[] => 
+	{
+		const [,...messages] = this.registeredMessageStrings_;
+		return messages;
+	}
+
+	private static readonly registeredMessages_: { [key: string]: Message<any, any> } = {};
+
+	private static readonly registeredMessageStrings_: string[] = ["ENGINE_WORKERS_INITIALIZE"];
+
+	public static readonly INITIALIZE_INDEX = 0;
+	private static registeredCounter_: number = 1; // zero is reserved for the initialization message
+
+	public static readonly MESSAGES = {
+		TEST: Engine.registerMessage<{ test: string }>("test"),
+	};
 
 	public readonly workersCount: WorkersCount;
 
@@ -57,7 +90,7 @@ export class Engine<WorkersCount extends number = 4>
 				throw new Error("Engine is already initialized!");
 		}
 
-		const messages = WorkerMessageSystem.getRegisteredMessages();
+		const messages = Engine.getRegisteredMessages();
 
 		const ws = this.workerSystem_ = await WorkerSystem.create(this.workersCount, messages);
 

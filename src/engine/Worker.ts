@@ -1,6 +1,5 @@
 import { assert } from "utils";
-import { Engine } from "./Engine";
-import { Message } from "./WorkerMessageSystem";
+import { Engine, Message } from "./Engine";
 
 export type WorkerInitializeData = {
 	index: number;
