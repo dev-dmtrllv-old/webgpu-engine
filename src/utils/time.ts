@@ -1,0 +1,1 @@
+export const now = () => process.hrtime()[0] * 1000000 + process.hrtime()[1] / 1000;

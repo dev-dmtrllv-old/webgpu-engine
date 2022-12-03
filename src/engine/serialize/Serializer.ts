@@ -2,9 +2,7 @@ import { FixedArray } from "./FixedArray";
 
 export namespace Serializer
 {
-	const IS_SERIALIZABLE = Symbol("IS_SERIALIZABLE");
 	const INDEX = Symbol("INDEX");
-	const TYPE = Symbol("TYPE");
 
 	interface Index<T extends TypeInfo> { readonly INDEX: number, type(): T };
 
@@ -45,12 +43,11 @@ export namespace Serializer
 	};
 
 	type Serializable<T extends TypeInfo> = Readonly<{
-		[IS_SERIALIZABLE]: true;
 		[INDEX]: number;
 		serialize: ObjectSerializer<T>;
 		parse: ObjectParser<T>;
-		_parse: Parser;
-		_serialize: Serializer;
+		// _parse: Parser;
+		// _serialize: Serializer;
 		props: ReadonlyArray<Prop>;
 		size: number;
 	}>;
@@ -142,7 +139,6 @@ export namespace Serializer
 					return [{ ...info, offset } as any, offset + info.size];
 				case "object":
 					{
-						console.log(prop)
 						if (prop.INDEX === undefined)
 							throw new Error("Given value is not serializable!");
 						const o = getSerializable(prop);
@@ -150,7 +146,6 @@ export namespace Serializer
 					}
 			}
 		}
-		throw new Error(`Could not get prop info for ${JSON.stringify(prop)}`);
 	}
 
 	const parseLayout = <T extends TypeInfo>(info: TypeLayout<T>): [Prop[], number] =>
@@ -185,9 +180,8 @@ export namespace Serializer
 		const type = Object.seal(Object.freeze({
 			name: name || `undefined-${index}`,
 			[INDEX]: index,
-			[IS_SERIALIZABLE]: true,
 			props,
-			_parse: (view, offset) => 
+			_parse: (view: DataView, offset: number) => 
 			{
 				let o: any = {};
 
@@ -196,19 +190,19 @@ export namespace Serializer
 
 				return o;
 			},
-			_serialize: (view, offset, data) => 
+			_serialize: (view: DataView, offset: number, data: any) => 
 			{
 				for (const prop of props)
 					prop._serialize(view, offset + prop.offset, data[prop.name]);
 			},
 			parse: <T extends TypeInfo>(buffer: ArrayBuffer, offset: number = 0): T => 
 			{
-				return type._parse(new DataView(buffer, offset, type.size), 0);
+				return (type as any)._parse(new DataView(buffer, offset, type.size), 0);
 			},
 			serialize: <T extends TypeInfo>(buffer: ArrayBuffer, obj: T, offset: number = 0) => 
 			{
 				const view = new DataView(buffer, offset, type.size);
-				type._serialize(view, 0, obj);
+				(type as any)._serialize(view, 0, obj);
 			},
 			size
 		})) as Serializable<T>;
@@ -216,7 +210,7 @@ export namespace Serializer
 		registeredTypes.push(type);
 		typeLayouts.push(JSON.parse(JSON.stringify(info)));
 
-		return { INDEX: index,  type: () => { return type } } as any;
+		return { INDEX: index,  type: () => type } as any;
 	}
 
 	export const createBuffer = <T extends TypeInfo, Shared extends boolean>(type: Serializable<T>, count: number = 1, shared?: Shared): Shared extends true ? SharedArrayBuffer : ArrayBuffer => new (shared ? SharedArrayBuffer : ArrayBuffer)(type.size * count) as any;

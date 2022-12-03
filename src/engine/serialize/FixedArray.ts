@@ -5,8 +5,11 @@ export class FixedArray<T, Size extends number>
 	public readonly capacity: Size;
 
 	private length_: number = 0;
-	public get length() { return this.length_; };
 	private lastIndex_: number = 0;
+
+	public get length() { return this.length_; };
+
+	public get data(): ReadonlyArray<T> { return [...this.data_]; }
 
 	public constructor(capacity: Size, ...data: T[])
 	{
@@ -17,7 +20,7 @@ export class FixedArray<T, Size extends number>
 
 	public push(...items: T[])
 	{
-		for(let i = 0, l = items.length; i< l; i++)
+		for (let i = 0, l = items.length; i < l; i++)
 		{
 			this.data_[this.lastIndex_++] = items[i];
 		}
@@ -34,7 +37,7 @@ export class FixedArray<T, Size extends number>
 
 	public set(index: number, item: T)
 	{
-		const set = this.data_[index] !== undefined;
+		const set = this.data_[index] === undefined;
 		this.length_ += +set;
 		this.data_[index] = item;
 	}
@@ -42,5 +45,37 @@ export class FixedArray<T, Size extends number>
 	public at(index: number): T | undefined
 	{
 		return this.data_[index];
+	}
+
+	public forEach(callback: (item: T, index: number, array: this) => any)
+	{
+		for (let i = 0, l = this.length_; i < l; i++)
+			callback(this.data_[i], i, this);
+	}
+
+	public async asyncForEach(callback: (item: T, index: number, array: this) => any)
+	{
+		for (let i = 0, l = this.length_; i < l; i++)
+			await callback(this.data_[i], i, this);
+	}
+
+	public map<Out>(callback: (item: T, index: number, array: this) => Out): FixedArray<Out, Size>
+	{
+		const out = new FixedArray<Out, Size>(this.capacity);
+
+		for (let i = 0, l = this.length_; i < l; i++)
+			out.set(i, callback(this.data_[i], i, this));
+
+		return out;
+	}
+	
+	public async asyncMap<Out>(callback: (item: T, index: number, array: this) => Out): Promise<FixedArray<Out, Size>>
+	{
+		const out = new FixedArray<Out, Size>(this.capacity);
+
+		for (let i = 0, l = this.length_; i < l; i++)
+			await out.set(i, callback(this.data_[i], i, this));
+
+		return out;
 	}
 }
