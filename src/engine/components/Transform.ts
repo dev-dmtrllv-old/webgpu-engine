@@ -11,4 +11,4 @@ export const TransformType = Serializer.createType<Transform>({
 	position: Vector2Type,
 	rotation: Vector2Type,
 	scale: Vector2Type
-});
+}, "Transform");

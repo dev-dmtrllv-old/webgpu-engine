@@ -4,7 +4,10 @@ export namespace Serializer
 {
 	const INDEX = Symbol("INDEX");
 
-	export interface Index<T extends TypeInfo> { readonly INDEX: number, type(): T };
+	export type Index<T extends TypeInfo> = Immutable<{
+		index: number;
+		type: Serializable<T>;
+	}>;
 
 	type PrimitiveInfo = {
 		_parse: Parser;
@@ -38,7 +41,7 @@ export namespace Serializer
 		never;
 	};
 
-	type Serializable<T extends TypeInfo> = Readonly<{
+	type Serializable<T extends TypeInfo> = Immutable<{
 		[INDEX]: number;
 		serialize: ObjectSerializer<T>;
 		parse: ObjectParser<T>;
@@ -131,7 +134,7 @@ export namespace Serializer
 					return [{ ...info, offset } as any, offset + info.size];
 				case "object":
 					{
-						if (prop.INDEX === undefined)
+						if (prop.index === undefined)
 							throw new Error("Given value is not serializable!");
 						const o = getSerializable(prop);
 						return [{ ...o, offset } as any, offset + o.size];
@@ -202,10 +205,10 @@ export namespace Serializer
 		registeredTypes.push(type);
 		typeLayouts.push(JSON.parse(JSON.stringify(info)));
 
-		return { INDEX: index,  type: () => type } as any;
+		return { index, type } as any;
 	}
 
 	export const createBuffer = <T extends TypeInfo, Shared extends boolean>(type: Serializable<T>, count: number = 1, shared?: Shared): Shared extends true ? SharedArrayBuffer : ArrayBuffer => new (shared ? SharedArrayBuffer : ArrayBuffer)(type.size * count) as any;
 
-	export const getSerializable = <T extends TypeInfo>(index: Index<T>): Serializable<T> => registeredTypes[index.INDEX];
+	export const getSerializable = <T extends TypeInfo>(index: Index<T>): Serializable<T> => registeredTypes[index.index as any];
 }
