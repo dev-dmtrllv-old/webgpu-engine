@@ -4,7 +4,7 @@ export namespace Serializer
 {
 	const INDEX = Symbol("INDEX");
 
-	interface Index<T extends TypeInfo> { readonly INDEX: number, type(): T };
+	export interface Index<T extends TypeInfo> { readonly INDEX: number, type(): T };
 
 	type PrimitiveInfo = {
 		_parse: Parser;
@@ -24,12 +24,8 @@ export namespace Serializer
 
 	type PrimitiveType = keyof typeof primitiveTypes;
 
-	type TypeInfo = {
+	export type TypeInfo = {
 		[key: string]: boolean | number | FixedArray<any, any> | TypeInfo;
-	};
-
-	type Object<T extends TypeInfo> = {
-		[K in keyof T]: T[K] extends PrimitiveType ? number : never;
 	};
 
 	type TypeLayout<T extends TypeInfo> = {
@@ -46,15 +42,11 @@ export namespace Serializer
 		[INDEX]: number;
 		serialize: ObjectSerializer<T>;
 		parse: ObjectParser<T>;
-		// _parse: Parser;
-		// _serialize: Serializer;
 		props: ReadonlyArray<Prop>;
 		size: number;
 	}>;
 
 	type PropInfo = { size: number, offset: number, _parse: Parser, _serialize: Serializer };
-
-
 
 	const primitiveTypes = {
 		u8: {

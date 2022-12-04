@@ -1,5 +1,6 @@
 import { assert } from "utils";
-import { Engine, Message } from "./Engine";
+import { Engine } from "./Engine";
+import { EngineMessages, Message } from "./EngineMessage";
 
 export type WorkerInitializeData = {
 	index: number;
@@ -37,18 +38,19 @@ class EngineWorker
 
 		this.index_ = index;
 		this.messageCount_ = messageCount;
-		this.messageBuffer_ = new Int32Array(messageBuffer, 0, messageBuffer.byteLength / Int32Array.BYTES_PER_ELEMENT);
 
+		this.messageBuffer_ = new Int32Array(messageBuffer, 0, messageBuffer.byteLength / Int32Array.BYTES_PER_ELEMENT);
+		// console.log(messages);
 		messages.forEach(msg => this.registeredMessages_[msg] = this.handlerCounter_++);
 
-		this.instance_ = new EngineWorker();
+		this.instance_ = new EngineWorker()
 
-		Atomics.notify(this.messageBuffer_, index * messageCount);
+		Atomics.store(this.messageBuffer_, 0, 1);
+		Atomics.notify(this.messageBuffer_, 0);
 	}
 
-
 	private static readonly registeredMessages_: { [key: string]: number } = {};
-	private static readonly messageHandlers_: ((data: any) => any)[] = [this.initialize];
+	private static readonly messageHandlers_: (MessageHandler<any>)[] = [this.initialize];
 
 	private static messageCount_: number = 0;
 	private static index_: number = 0;
@@ -57,39 +59,46 @@ class EngineWorker
 
 	private static readonly handleMessage = async (e: MessageEvent<any>) =>
 	{
-		assert(() => e.data.message !== undefined, "Could not get message!");
+		const message = e.data.message;
 
-		const handler = this.messageHandlers_[e.data.message];
+		assert(() => message !== undefined, "Could not get message!");
+
+		const handler = this.messageHandlers_[message];
 		if (!handler)
 		{
-			console.warn(`Could not find handler for message with index ${e.data.message}`);
+			console.warn(`Could not find handler for message with index ${message}`);
 			return;
 		}
-		await handler(e.data.data || {});
-		Atomics.notify(this.messageBuffer_, (this.index_ * this.messageCount_) + e.data.message);
+		const result = await handler(e.data.data);
+		if (typeof result === "number")
+			Atomics.store(this.messageBuffer_, message, result);
+		Atomics.notify(this.messageBuffer_, message);
 	}
 
 	public static readonly main = async (): Promise<void> =>
 	{
-		console.log("Worker entry");
 		self.onmessage = this.handleMessage;
 	}
 
-	private onMessage = <Args>(message: Message<any, Args>, callback: (data: Args) => any) =>
-	{
-		const index = EngineWorker.registeredMessages_[message.message];
-		if (index === undefined)
-			throw new Error(`Could not get index for message ${message}!`);
-		EngineWorker.messageHandlers_[index] = callback;
-	}
 
 	private constructor()
 	{
-		this.onMessage(Engine.MESSAGES.TEST, ({ test }) => 
+		this.onMessage(EngineMessages.TEST, ({ test }) => 
 		{
-			console.log("got test message with data:", test);
+			return Math.round((Math.random() * 10) + 1 + test);
 		});
 	}
+
+	private onMessage = <Args>(message: Message<any, Args>, callback: MessageHandler<Args>) =>
+	{
+		const index = EngineWorker.registeredMessages_[message.message];
+		if (index === undefined)
+			throw new Error(`Could not get index for message ${message.index}!`);
+		EngineWorker.messageHandlers_[index] = callback;
+	}
+
 }
 
 EngineWorker.main();
+
+type MessageHandler<T> = (data: T) => number | any;

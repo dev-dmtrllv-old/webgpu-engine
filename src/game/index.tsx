@@ -1,3 +1,7 @@
 import { Engine } from "engine/Engine";
 
-const engine = Engine.initialize(3);
+const engine = await Engine.initialize(3);
+
+const glob = global as any;
+
+glob.engine = engine;
